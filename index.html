@@ -1,0 +1,1092 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#fbeee6">
+<meta name="description" content="想买东西先写申请单，递给你的 AI 审批。可以一位审，也可以几位一起投票。数据只存在你自己的浏览器里。">
+<title>购物申请单</title>
+<style>
+  :root {
+    --ink: #2c3a47;
+    --ink2: #566676;
+    --ink3: #5d6b79;
+    --line: rgba(110, 140, 165, 0.2);
+    --field: #f7fafc;
+    --accent: #b05a38;
+    --accent-soft: #fbe6da;
+    --accent-line: #e3a083;
+    --accent-ink: #8f4527;
+    --ice: #eef4f9;
+    --ice-ink: #36556f;
+    --approved: #357a68;
+    --rejected: #b4566b;
+    --conditional: #946519;
+    --pending: #5f7385;
+    --withdrawn: #6a7783;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Noto Sans SC", sans-serif;
+    background: linear-gradient(180deg, #fbeee6 0%, #f8f3f1 18%, #f2f6f9 52%, #e5eef6 100%) fixed;
+  }
+  .page {
+    max-width: 440px;
+    margin: 0 auto;
+    padding: calc(22px + env(safe-area-inset-top)) 14px calc(40px + env(safe-area-inset-bottom));
+  }
+  h1 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    font-size: 26px;
+    font-weight: 650;
+    letter-spacing: 0.5px;
+  }
+  .lamp {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #ffe2b8 0 38%, #f2a36b 70%);
+    box-shadow: 0 0 14px 5px rgba(242, 163, 107, 0.42);
+  }
+  .sub { margin: 6px 0 0; font-size: 13px; color: var(--ink2); }
+  .stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    margin: 10px 2px 14px;
+    font-size: 12px;
+    color: var(--ink2);
+  }
+  .card {
+    margin-bottom: 12px;
+    padding: 16px;
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.94);
+    box-shadow: 0 8px 24px rgba(60, 100, 140, 0.07);
+  }
+  h2 { margin: 0 0 12px; font-size: 15px; font-weight: 650; }
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 14px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  input, textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid rgba(110, 140, 165, 0.3);
+    border-radius: 12px;
+    background: var(--field);
+    color: var(--ink);
+    font: inherit;
+    font-size: 16px;
+    font-weight: 400;
+  }
+  textarea { resize: vertical; line-height: 1.5; }
+  input::placeholder, textarea::placeholder { color: #8a97a3; }
+  input:focus-visible, textarea:focus-visible, button:focus-visible, a:focus-visible {
+    outline: 2px solid #4f7fa8;
+    outline-offset: 2px;
+  }
+  .price { position: relative; display: block; }
+  .price span {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--ink3);
+    font-weight: 400;
+  }
+  .price input { padding-left: 28px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    flex: 1 0 auto;
+    min-width: 64px;
+    min-height: 36px;
+    padding: 7px 12px;
+    border: 1px solid rgba(110, 140, 165, 0.32);
+    border-radius: 999px;
+    background: #fff;
+    color: var(--ink2);
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .chip[aria-pressed="true"], .chip.weight {
+    border-color: var(--accent-line);
+    background: var(--accent-soft);
+    color: var(--accent-ink);
+    font-weight: 650;
+  }
+  .hint { font-size: 12px; font-weight: 400; color: var(--ink3); }
+  .err { margin: 0 0 10px; font-size: 13px; color: var(--rejected); }
+  .err:empty { display: none; }
+  .btn { border: none; border-radius: 14px; font: inherit; cursor: pointer; }
+  .btn.primary {
+    width: 100%;
+    padding: 12px 0;
+    background: var(--accent);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 650;
+  }
+  .btn.small { min-height: 32px; padding: 6px 12px; border-radius: 999px; font-size: 12px; }
+  .btn.small.primary { width: auto; padding: 6px 16px; }
+  .btn.soft { background: var(--ice); color: var(--ice-ink); }
+  .btn.ghost { border: 1px solid rgba(110, 140, 165, 0.42); background: transparent; color: var(--ink2); }
+  .btn.danger { border-color: rgba(180, 86, 107, 0.38); color: var(--rejected); }
+  .rv-list { display: flex; flex-wrap: wrap; gap: 8px; }
+  .rv-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px 2px 2px 12px;
+    border-radius: 999px;
+    background: var(--ice);
+    color: var(--ice-ink);
+    font-size: 13px;
+  }
+  .rv-chip button {
+    width: 30px;
+    height: 30px;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--ice-ink);
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .rv-add { display: flex; gap: 8px; margin-top: 12px; }
+  .rv-add input { flex: 1; padding: 8px 12px; }
+  .section { margin: 22px 2px 10px; font-size: 15px; font-weight: 650; }
+  .empty { margin: 0; padding: 4px 2px 12px; font-size: 13px; color: var(--ink3); }
+  .req-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+  .req-title { min-width: 0; }
+  .req h3 { margin: 0; font-size: 16px; word-break: break-word; }
+  .meta { margin: 3px 0 0; font-size: 12px; color: var(--ink3); word-break: keep-all; }
+  .stamp {
+    flex-shrink: 0;
+    margin-top: 4px;
+    padding: 3px 8px;
+    border: 2px solid currentColor;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    transform: rotate(-8deg);
+  }
+  .stamp.withdrawn { border-style: dashed; }
+  .approved { color: var(--approved); }
+  .rejected { color: var(--rejected); }
+  .conditional { color: var(--conditional); }
+  .pending { color: var(--pending); }
+  .withdrawn { color: var(--withdrawn); }
+  .reason {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    width: 100%;
+    margin: 10px 0 2px;
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--ink2);
+    font: inherit;
+    font-size: 13px;
+    line-height: 1.55;
+    text-align: left;
+    white-space: pre-wrap;
+    word-break: break-word;
+    cursor: pointer;
+  }
+  .reason.open { display: block; -webkit-line-clamp: unset; }
+  .votes { display: flex; flex-direction: column; gap: 10px; margin: 10px 0 0; padding: 0; list-style: none; }
+  .vote { padding-top: 10px; border-top: 1px dashed var(--line); }
+  .vote-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; font-size: 13px; }
+  .who { min-width: 3em; font-weight: 650; }
+  .v { font-weight: 650; }
+  .v.none { color: var(--ink3); font-weight: 400; }
+  .note { font-style: italic; word-break: break-word; }
+  .vote-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .paste-box { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+  .prompt-view { font-size: 14px; }
+  .paste-row { display: flex; justify-content: flex-end; }
+  .paste-msg { margin: 0; font-size: 12px; color: var(--rejected); }
+  .paste-msg:empty { display: none; }
+  .chip.verdict { flex: 1; font-weight: 650; }
+  .chip.verdict.approved { color: var(--approved); }
+  .chip.verdict.conditional { color: var(--conditional); }
+  .chip.verdict.rejected { color: var(--rejected); }
+  .note-in { padding: 8px 12px; }
+  .prompt-box { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+  .changed { margin: 8px 0 0; font-size: 12px; color: var(--ink3); }
+  .req-foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+  .how ol { margin: 0; padding-left: 20px; color: var(--ink2); font-size: 13px; line-height: 1.75; }
+  .foot { margin-top: 20px; color: var(--ink3); font-size: 12px; line-height: 1.75; text-align: center; }
+  .foot p { margin: 0; }
+  .foot a { color: var(--ice-ink); }
+  .foot-btns { display: flex; justify-content: center; gap: 8px; margin: 8px 0; }
+  .toast {
+    position: fixed;
+    left: 50%;
+    bottom: calc(24px + env(safe-area-inset-bottom));
+    max-width: calc(100% - 32px);
+    padding: 10px 16px;
+    border-radius: 999px;
+    background: rgba(44, 58, 71, 0.94);
+    color: #fff;
+    font-size: 13px;
+    text-align: center;
+    opacity: 0;
+    pointer-events: none;
+    transform: translate(-50%, 16px);
+    transition: opacity 0.2s, transform 0.2s;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  [hidden] { display: none !important; }
+  @media (prefers-reduced-motion: reduce) {
+    .toast { transition: none; }
+  }
+</style>
+</head>
+<body>
+<main class="page">
+  <header>
+    <h1><span class="lamp" aria-hidden="true"></span>购物申请单</h1>
+    <p class="sub">想买什么，先写下来，递给你的 AI 批。</p>
+    <p class="stats" id="stats"></p>
+  </header>
+
+  <section class="card" aria-labelledby="rv-title">
+    <h2 id="rv-title">我的审批人</h2>
+    <div class="rv-list" id="rv-list"></div>
+    <form class="rv-add" id="rv-form">
+      <label class="sr-only" for="rv-name">新审批人的名字</label>
+      <input id="rv-name" maxlength="12" placeholder="再加一位，比如你家 AI 的名字" autocomplete="off">
+      <button type="submit" class="btn small soft">添加</button>
+    </form>
+  </section>
+
+  <form class="card" id="req-form" novalidate aria-labelledby="form-title">
+    <h2 id="form-title">写一张申请</h2>
+    <label class="field">想买什么
+      <input id="f-item" maxlength="60" placeholder="比如：降噪耳机" autocomplete="off">
+    </label>
+    <label class="field">多少钱
+      <span class="price"><span aria-hidden="true">¥</span><input id="f-price" inputmode="decimal" placeholder="1299" autocomplete="off"></span>
+    </label>
+    <label class="field">为什么要买
+      <textarea id="f-reason" maxlength="800" rows="3" placeholder="理由写清楚，审批人会认真看"></textarea>
+    </label>
+    <div class="field" role="group" aria-labelledby="urg-label">
+      <span id="urg-label">急不急</span>
+      <div class="chips" id="urg"></div>
+    </div>
+    <div class="field" role="group" aria-labelledby="who-label">
+      <span id="who-label">谁来审</span>
+      <div class="chips" id="who"></div>
+      <span class="hint" id="who-hint"></span>
+    </div>
+    <div class="field" role="group" aria-labelledby="rule-label" id="rule-box" hidden>
+      <span id="rule-label">怎么算</span>
+      <div class="chips" id="rule"></div>
+      <span class="hint" id="rule-hint"></span>
+      <div class="chips" id="weights" hidden></div>
+    </div>
+    <p class="err" id="form-err" role="alert"></p>
+    <button type="submit" class="btn primary" id="submit">递出申请</button>
+  </form>
+
+  <section aria-labelledby="list-title">
+    <h2 class="section" id="list-title">我的申请单</h2>
+    <div id="list"></div>
+  </section>
+
+  <section class="card how" aria-labelledby="how-title">
+    <h2 id="how-title">怎么用</h2>
+    <ol>
+      <li>在「我的审批人」里写上你家 AI 的名字，可以加好几位。</li>
+      <li>写好申请递出去，点审批人旁边的「复制申请」，发给那位 AI。</li>
+      <li>它回完，把整段回复贴回来点「识别」，结论会自动盖到单子上。它没按格式写的话，看完回复自己点结论。</li>
+    </ol>
+  </section>
+
+  <footer class="foot">
+    <p>单子只存在这个浏览器里，不上传任何地方。换手机、清缓存之前记得导出。</p>
+    <div class="foot-btns">
+      <button type="button" class="btn small ghost" id="export">导出备份</button>
+      <button type="button" class="btn small ghost" id="import-btn">导入备份</button>
+      <input type="file" id="import" accept="application/json,.json" hidden>
+    </div>
+    <p>灵感来自小程序「钱包请等等」的审批群玩法 · <a href="https://github.com/chaodeng060-source/Money-Application-Form">源码</a></p>
+  </footer>
+</main>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(() => {
+  'use strict';
+
+  const KEY = 'ai-purchase-approval:v1';
+  const ITEM_MAX = 60;
+  const REASON_MAX = 800;
+  const NOTE_MAX = 40;
+  const NAME_MAX = 12;
+  const REVIEWER_MAX = 8;
+  const PRICE_MAX = 10000000;
+
+  const URGENCY = [
+    { id: 'now', label: '现在就要' },
+    { id: 'month', label: '这个月要' },
+    { id: 'whenever', label: '不急' },
+  ];
+  const RULES = [
+    { id: 'majority', label: '多数通过', hint: '过半同意就批，票投完还打平算驳回' },
+    { id: 'all', label: '全票通过', hint: '每一位都同意才批，有一位驳回就不批' },
+    { id: 'weighted', label: '权重', hint: '每位 1–3 票，点名字改票数，赞成票过半就批' },
+  ];
+  const STATUS = {
+    pending: '待审批',
+    approved: '批准',
+    conditional: '有条件批准',
+    rejected: '驳回',
+    withdrawn: '已撤回',
+  };
+  const VERDICTS = ['approved', 'conditional', 'rejected'];
+  const ALIASES = {
+    approve: 'approved', approved: 'approved', '批准': 'approved', '同意': 'approved', '通过': 'approved', '准': 'approved',
+    conditional: 'conditional', '有条件': 'conditional', '附条件': 'conditional', '有条件批准': 'conditional', '有条件通过': 'conditional',
+    reject: 'rejected', rejected: 'rejected', '驳回': 'rejected', '不批': 'rejected', '否决': 'rejected', '拒绝': 'rejected',
+  };
+  // [[审批:p261023-ab12:批准|批语]]，半角全角冒号、竖线都认，也认英文 purchase
+  const TAG_RE = /\[\[\s*(?:审批|purchase)\s*[:：]\s*#?(p\d{6}-[0-9a-f]{4})\s*[:：]\s*([^\]|｜]+?)\s*(?:[|｜]([^\]]*))?\]\]/gi;
+  const MARK_RE = /【购物申请\s*#p\d{6}-[0-9a-f]{4}】/gi;
+
+  const $ = (id) => document.getElementById(id);
+
+  function h(tag, attrs, ...kids) {
+    const el = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs || {})) {
+      if (v === null || v === undefined || v === false) continue;
+      if (k === 'text') el.textContent = v;
+      else if (k === 'class') el.className = v;
+      else if (k.startsWith('on') && typeof v === 'function') el.addEventListener(k.slice(2), v);
+      else el.setAttribute(k, v === true ? '' : String(v));
+    }
+    for (const kid of kids.flat()) {
+      if (kid === null || kid === undefined || kid === false) continue;
+      el.append(kid instanceof Node ? kid : String(kid));
+    }
+    return el;
+  }
+
+  // ---------- 小工具 ----------
+
+  function hex(bytes) {
+    const a = new Uint8Array(bytes);
+    crypto.getRandomValues(a);
+    return Array.from(a, (b) => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  function newReviewerId() {
+    return 'r' + hex(4);
+  }
+
+  function newRequestId() {
+    const d = new Date();
+    const p2 = (n) => String(n).padStart(2, '0');
+    const day = p2(d.getFullYear() % 100) + p2(d.getMonth() + 1) + p2(d.getDate());
+    let id;
+    do { id = 'p' + day + '-' + hex(2); } while (state.requests.some((r) => r.id === id));
+    return id;
+  }
+
+  function clampWeight(w) {
+    const n = Math.round(Number(w));
+    return Number.isFinite(n) ? Math.min(3, Math.max(1, n)) : 1;
+  }
+
+  function money(n) {
+    const v = Number(n) || 0;
+    return '¥' + v.toLocaleString('zh-CN', {
+      minimumFractionDigits: Number.isInteger(v) ? 0 : 2,
+      maximumFractionDigits: 2,
+    });
+  }
+
+  function when(iso) {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    const p2 = (n) => String(n).padStart(2, '0');
+    return `${p2(d.getMonth() + 1)}-${p2(d.getDate())} ${p2(d.getHours())}:${p2(d.getMinutes())}`;
+  }
+
+  const urgencyLabel = (id) => (URGENCY.find((u) => u.id === id) || {}).label || '没说';
+  const ruleLabel = (id) => (RULES.find((r) => r.id === id) || {}).label || '';
+
+  // 自己填的字里不许混进编号和审批标记，免得 AI 照抄出一个假结论
+  function clean(value, limit) {
+    return String(value || '')
+      .replace(/\r\n/g, '\n')
+      .replace(TAG_RE, '')
+      .replace(MARK_RE, '')
+      .trim()
+      .slice(0, limit)
+      .trim();
+  }
+
+  // ---------- 数据 ----------
+
+  function blankState() {
+    return { schema: 1, reviewers: [{ id: newReviewerId(), name: '我的 AI' }], requests: [] };
+  }
+
+  function normalize(doc) {
+    if (!doc || typeof doc !== 'object' || !Array.isArray(doc.requests) || !Array.isArray(doc.reviewers)) {
+      throw new Error('不是购物申请单的备份文件');
+    }
+    const reviewers = doc.reviewers
+      .filter((r) => r && typeof r.id === 'string' && typeof r.name === 'string' && r.name.trim())
+      .slice(0, REVIEWER_MAX)
+      .map((r) => ({ id: r.id, name: r.name.trim().slice(0, NAME_MAX) }));
+    const requests = doc.requests
+      .filter((r) => r && typeof r.id === 'string' && Array.isArray(r.reviewers))
+      .map((r) => {
+        const rv = r.reviewers
+          .filter((x) => x && typeof x.id === 'string')
+          .map((x) => ({ id: x.id, name: String(x.name || '?').slice(0, NAME_MAX), weight: clampWeight(x.weight) }));
+        const votes = {};
+        for (const x of rv) {
+          const v = r.votes && r.votes[x.id];
+          if (v && VERDICTS.includes(v.status)) {
+            votes[x.id] = { status: v.status, note: String(v.note || '').slice(0, NOTE_MAX), at: String(v.at || '') };
+          }
+        }
+        // 每个人都得投票时，「一票否决」和「全票通过」是一回事，老备份里的并过去
+        let rule = r.rule === 'veto' ? 'all' : r.rule;
+        if (rv.length < 2) rule = 'single';
+        else if (!RULES.some((x) => x.id === rule)) rule = 'majority';
+        const rec = {
+          id: r.id,
+          item: String(r.item || '').slice(0, ITEM_MAX),
+          price: Number(r.price) > 0 ? Number(r.price) : 0,
+          reason: String(r.reason || '').slice(0, REASON_MAX),
+          urgency: URGENCY.some((u) => u.id === r.urgency) ? r.urgency : 'whenever',
+          rule,
+          reviewers: rv,
+          votes,
+          history: Array.isArray(r.history) ? r.history.slice(-10) : [],
+          created_at: String(r.created_at || new Date().toISOString()),
+          status: 'pending',
+        };
+        rec.status = r.status === 'withdrawn' ? 'withdrawn' : tally(rec);
+        return rec;
+      })
+      .filter((r) => r.reviewers.length);
+    return { schema: 1, reviewers, requests };
+  }
+
+  function loadState() {
+    let raw = null;
+    try {
+      raw = localStorage.getItem(KEY);
+    } catch (e) {
+      return blankState();
+    }
+    if (!raw) return blankState();
+    try {
+      return normalize(JSON.parse(raw));
+    } catch (e) {
+      // 读不出来的旧数据原样另存，不拿空白覆盖
+      try { localStorage.setItem(KEY + ':broken-' + Date.now(), raw); } catch (e2) { /* 存不下就算了 */ }
+      queueMicrotask(() => toast('之前的数据读不出来，原样另存了一份，这里先重新开始'));
+      return blankState();
+    }
+  }
+
+  function save() {
+    try {
+      localStorage.setItem(KEY, JSON.stringify(state));
+      return true;
+    } catch (e) {
+      toast('存不进浏览器（可能是无痕模式或空间满了），刷新后这次改动会丢');
+      return false;
+    }
+  }
+
+  // ---------- 规则 ----------
+
+  // 「有条件批准」算赞成票；只要有一票有条件，通过的章就是「有条件批准」
+  function tally(rec) {
+    const weight = (r) => (rec.rule === 'weighted' ? clampWeight(r.weight) : 1);
+    const total = rec.reviewers.reduce((s, r) => s + weight(r), 0);
+    let yes = 0;
+    let no = 0;
+    let cast = 0;
+    let withCondition = false;
+    for (const r of rec.reviewers) {
+      const v = rec.votes[r.id];
+      if (!v) continue;
+      cast += 1;
+      if (v.status === 'rejected') {
+        no += weight(r);
+      } else {
+        yes += weight(r);
+        if (v.status === 'conditional') withCondition = true;
+      }
+    }
+    const passed = withCondition ? 'conditional' : 'approved';
+    const allCast = cast === rec.reviewers.length;
+    if (rec.rule === 'all') {
+      if (no) return 'rejected';
+      return allCast ? passed : 'pending';
+    }
+    // 一位审批人 / 多数通过 / 权重：过半就定，票投完还打平就驳回（拿不准的钱先别花）
+    if (yes * 2 > total) return passed;
+    if (no * 2 > total || allCast) return 'rejected';
+    return 'pending';
+  }
+
+  function stats() {
+    const now = new Date();
+    const thisMonth = state.requests.filter((r) => {
+      const d = new Date(r.created_at);
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+    });
+    const ok = thisMonth.filter((r) => r.status === 'approved' || r.status === 'conditional');
+    return {
+      month: now.getMonth() + 1,
+      submitted: thisMonth.length,
+      approved: ok.length,
+      rejected: thisMonth.filter((r) => r.status === 'rejected').length,
+      pending: state.requests.filter((r) => r.status === 'pending').length,
+      amount: Math.round(ok.reduce((s, r) => s + r.price, 0) * 100) / 100,
+    };
+  }
+
+  function promptFor(rec, reviewer) {
+    const s = stats();
+    const lines = [
+      `【购物申请 #${rec.id}】`,
+      `想买：${rec.item}`,
+      `多少钱：${money(rec.price)}`,
+      `为什么：${rec.reason}`,
+      `急不急：${urgencyLabel(rec.urgency)}`,
+      '',
+      `这个月我递了 ${s.submitted} 单，批了 ${s.approved} 单共 ${money(s.amount)}，驳回 ${s.rejected} 单。`,
+    ];
+    const recent = state.requests.filter((r) => r.id !== rec.id && r.status !== 'withdrawn').slice(0, 5);
+    if (recent.length) {
+      lines.push('最近几单：' + recent.map((r) => `${r.item} ${money(r.price)} → ${STATUS[r.status]}`).join('；'));
+    }
+    lines.push('', `你是这张单的审批人「${reviewer.name}」。认真看价格、理由、急不急，还有我最近买过什么：合理就批，不合理就驳回或者附条件，把为什么说清楚。别一律批，也别说教。钱是我的，你是陪我想清楚。`);
+    if (rec.reviewers.length > 1) {
+      const names = rec.reviewers.map((r) => r.name + (rec.rule === 'weighted' ? `（${r.weight} 票）` : '')).join('、');
+      lines.push(`这是多人审批，规则「${ruleLabel(rec.rule)}」，审批人：${names}。你只投你自己那一票。`);
+      const cast = rec.reviewers.filter((r) => r.id !== reviewer.id && rec.votes[r.id]);
+      if (cast.length) {
+        lines.push('已经投了：' + cast.map((r) => {
+          const v = rec.votes[r.id];
+          return `${r.name} ${STATUS[v.status]}` + (v.note ? `「${v.note}」` : '');
+        }).join('；') + '。可以参考，也可以投不一样的。');
+      }
+    }
+    lines.push('', '回复的最后单独写一行审批标记：', `[[审批:${rec.id}:批准|一句批语]]`, '结论从「批准 / 有条件 / 驳回」里选一个，批语 40 字以内。');
+    return lines.join('\n');
+  }
+
+  function parseReply(text, rec) {
+    const src = String(text || '').replace(/［/g, '[').replace(/］/g, ']');
+    const found = Array.from(src.matchAll(TAG_RE));
+    if (!found.length) return { error: '没找到审批标记。看完回复，在下面直接点它的结论就行。' };
+    const mine = found.filter((m) => m[1].toLowerCase() === rec.id);
+    if (!mine.length) return { error: `这段回复里的编号是 #${found[0][1]}，不是这张单（#${rec.id}）。` };
+    const m = mine[mine.length - 1]; // 它中途改口的话，以最后一个为准
+    const word = m[2].trim();
+    const status = ALIASES[word.toLowerCase()];
+    if (!status) return { error: `标记里的结论「${word}」认不出来，在下面直接点结论吧。` };
+    return { status, note: (m[3] || '').trim().slice(0, NOTE_MAX) };
+  }
+
+  function castVote(rec, reviewerId, status, note) {
+    if (rec.status === 'withdrawn') return false;
+    const prev = rec.votes[reviewerId];
+    if (prev) rec.history = rec.history.concat({ by: reviewerId, ...prev }).slice(-10);
+    rec.votes[reviewerId] = { status, note: String(note || '').slice(0, NOTE_MAX), at: new Date().toISOString() };
+    rec.status = tally(rec);
+    return true;
+  }
+
+  // ---------- 状态 ----------
+
+  let state = loadState();
+  const ui = {
+    selected: new Set(state.reviewers.slice(0, 1).map((r) => r.id)),
+    urgency: 'month',
+    rule: 'majority',
+    weights: {},
+    expanded: new Set(),
+    pasting: new Set(),
+    showPrompt: new Set(),
+    drafts: {},
+    notes: {},
+  };
+
+  // ---------- 渲染 ----------
+
+  // 重画之后把键盘焦点还给原来那个按钮
+  function withFocus(fn) {
+    const active = document.activeElement;
+    const key = active && active.dataset ? active.dataset.focus : '';
+    fn();
+    if (key) {
+      const again = document.querySelector('[data-focus="' + CSS.escape(key) + '"]');
+      if (again && again !== document.activeElement) again.focus();
+    }
+  }
+
+  const render = () => withFocus(() => {
+    renderStats();
+    renderReviewers();
+    renderForm();
+    renderList();
+  });
+  const rerenderForm = () => withFocus(renderForm);
+
+  function renderStats() {
+    const s = stats();
+    $('stats').replaceChildren(...[
+      h('span', { text: `${s.month} 月递了 ${s.submitted} 单` }),
+      h('span', { text: `批了 ${s.approved} 单 · ${money(s.amount)}` }),
+      s.pending ? h('span', { class: 'conditional', text: `${s.pending} 单在等` }) : null,
+    ].filter(Boolean));
+  }
+
+  function renderReviewers() {
+    if (!state.reviewers.length) {
+      $('rv-list').replaceChildren(h('p', { class: 'empty', text: '还没有审批人，先加一位。' }));
+      return;
+    }
+    $('rv-list').replaceChildren(...state.reviewers.map((r) => h('span', { class: 'rv-chip' },
+      h('span', { text: r.name }),
+      h('button', {
+        type: 'button',
+        'aria-label': `删掉审批人${r.name}`,
+        onclick: () => removeReviewer(r),
+        text: '×',
+      }))));
+  }
+
+  function chip(label, pressed, focusKey, onclick, extra) {
+    return h('button', {
+      type: 'button',
+      class: 'chip',
+      'aria-pressed': String(pressed),
+      'data-focus': focusKey,
+      onclick,
+      ...(extra || {}),
+      text: label,
+    });
+  }
+
+  function renderForm() {
+    for (const id of Array.from(ui.selected)) {
+      if (!state.reviewers.some((r) => r.id === id)) ui.selected.delete(id);
+    }
+    const picked = state.reviewers.filter((r) => ui.selected.has(r.id));
+    const multi = picked.length > 1;
+
+    $('urg').replaceChildren(...URGENCY.map((u) => chip(u.label, ui.urgency === u.id, 'urg:' + u.id, () => {
+      ui.urgency = u.id;
+      rerenderForm();
+    })));
+
+    $('who').replaceChildren(...state.reviewers.map((r) => chip(r.name, ui.selected.has(r.id), 'who:' + r.id, () => {
+      if (ui.selected.has(r.id)) ui.selected.delete(r.id);
+      else ui.selected.add(r.id);
+      rerenderForm();
+    })));
+    $('who-hint').textContent = !state.reviewers.length
+      ? '先在上面加一位审批人'
+      : !picked.length
+        ? '至少选一位'
+        : multi
+          ? `${picked.length} 位一起审，每位投一票`
+          : `${picked[0].name}一个人说了算`;
+
+    $('rule-box').hidden = !multi;
+    $('rule').replaceChildren(...RULES.map((r) => chip(r.label, ui.rule === r.id, 'rule:' + r.id, () => {
+      ui.rule = r.id;
+      rerenderForm();
+    })));
+    $('rule-hint').textContent = (RULES.find((r) => r.id === ui.rule) || {}).hint || '';
+
+    const weighted = multi && ui.rule === 'weighted';
+    $('weights').hidden = !weighted;
+    $('weights').replaceChildren(...(weighted ? picked : []).map((r) => {
+      const w = clampWeight(ui.weights[r.id]);
+      return chip(`${r.name} × ${w}`, true, 'w:' + r.id, () => {
+        ui.weights[r.id] = (w % 3) + 1;
+        rerenderForm();
+      }, { class: 'chip weight', 'aria-pressed': null, 'aria-label': `${r.name} ${w} 票，点一下改` });
+    }));
+
+    $('submit').textContent = multi
+      ? `递给 ${picked.length} 位审批人`
+      : picked.length ? `递给${picked[0].name}` : '递出申请';
+  }
+
+  function renderList() {
+    if (!state.requests.length) {
+      $('list').replaceChildren(h('p', { class: 'empty', text: '还没递过单。' }));
+      return;
+    }
+    $('list').replaceChildren(...state.requests.map(renderRequest));
+  }
+
+  function renderRequest(rec) {
+    const multi = rec.reviewers.length > 1;
+    const open = ui.expanded.has(rec.id);
+    const meta = [money(rec.price), urgencyLabel(rec.urgency), when(rec.created_at), multi ? ruleLabel(rec.rule) : '']
+      .filter(Boolean).join(' · ');
+    return h('article', { class: 'card req', 'aria-label': `${rec.item}，${STATUS[rec.status]}` },
+      h('div', { class: 'req-head' },
+        h('div', { class: 'req-title' },
+          h('h3', { text: rec.item }),
+          h('p', { class: 'meta', text: meta })),
+        h('span', { class: 'stamp ' + rec.status, text: STATUS[rec.status] })),
+      h('button', {
+        type: 'button',
+        class: 'reason' + (open ? ' open' : ''),
+        'aria-expanded': String(open),
+        'data-focus': 'reason:' + rec.id,
+        onclick: () => {
+          if (open) ui.expanded.delete(rec.id);
+          else ui.expanded.add(rec.id);
+          render();
+        },
+        text: rec.reason,
+      }),
+      h('ul', { class: 'votes', 'aria-label': '审批人的票' }, rec.reviewers.map((rv) => renderVote(rec, rv))),
+      rec.history.length ? h('p', { class: 'changed', text: '有人改过票' }) : null,
+      h('div', { class: 'req-foot' },
+        rec.status === 'pending'
+          ? h('button', { type: 'button', class: 'btn small ghost', 'data-focus': 'withdraw:' + rec.id, onclick: () => withdraw(rec), text: '撤回' })
+          : null,
+        h('button', { type: 'button', class: 'btn small ghost danger', 'data-focus': 'del:' + rec.id, onclick: () => removeRequest(rec), text: '删除' })));
+  }
+
+  function renderVote(rec, rv) {
+    const v = rec.votes[rv.id];
+    const key = rec.id + ':' + rv.id;
+    const canAct = rec.status !== 'withdrawn';
+    const pasting = canAct && ui.pasting.has(key);
+    return h('li', { class: 'vote' },
+      h('div', { class: 'vote-line' },
+        h('span', { class: 'who', text: rv.name + (rec.rule === 'weighted' ? ` ×${rv.weight}` : '') }),
+        v ? h('span', { class: 'v ' + v.status, text: STATUS[v.status] }) : h('span', { class: 'v none', text: '还没投' }),
+        v && v.note ? h('span', { class: 'note ' + v.status, text: `「${v.note}」` }) : null),
+      canAct ? h('div', { class: 'vote-actions' },
+        h('button', {
+          type: 'button',
+          class: 'btn small soft',
+          'data-focus': 'copy:' + key,
+          onclick: () => copyPrompt(rec, rv),
+          text: '复制申请',
+        }),
+        h('button', {
+          type: 'button',
+          class: 'btn small soft',
+          'aria-expanded': String(pasting),
+          'data-focus': 'paste:' + key,
+          onclick: () => {
+            if (pasting) ui.pasting.delete(key);
+            else ui.pasting.add(key);
+            render();
+            if (!pasting) {
+              const box = document.getElementById('paste-' + key);
+              if (box) box.focus();
+            }
+          },
+          text: v ? '改票' : '贴回复',
+        })) : null,
+      canAct && ui.showPrompt.has(key) ? renderPromptView(rec, rv, key) : null,
+      pasting ? renderPaste(rec, rv, key) : null);
+  }
+
+  function renderPromptView(rec, rv, key) {
+    const view = h('textarea', { class: 'prompt-view', readonly: true, rows: '7', 'aria-label': `发给${rv.name}的申请文字` });
+    view.value = promptFor(rec, rv);
+    return h('div', { class: 'prompt-box' },
+      h('span', { class: 'hint', text: '没能自动复制，长按全选这段文字发给它：' }),
+      view,
+      h('div', { class: 'paste-row' },
+        h('button', {
+          type: 'button',
+          class: 'btn small ghost',
+          onclick: () => { ui.showPrompt.delete(key); render(); },
+          text: '收起',
+        })));
+  }
+
+  function renderPaste(rec, rv, key) {
+    const box = h('textarea', {
+      id: 'paste-' + key,
+      rows: '4',
+      'aria-label': `把${rv.name}的回复贴在这里`,
+      placeholder: `把${rv.name}的整段回复贴在这里`,
+      oninput: (e) => { ui.drafts[key] = e.target.value; },
+    });
+    box.value = ui.drafts[key] || '';
+    const note = h('input', {
+      class: 'note-in',
+      maxlength: String(NOTE_MAX),
+      placeholder: '批语，可以不填',
+      'aria-label': '批语，可以不填',
+      oninput: (e) => { ui.notes[key] = e.target.value; },
+    });
+    note.value = ui.notes[key] || '';
+    const msg = h('p', { class: 'paste-msg', role: 'alert' });
+    return h('div', { class: 'paste-box' },
+      box,
+      h('div', { class: 'paste-row' },
+        h('button', {
+          type: 'button',
+          class: 'btn small primary',
+          onclick: () => {
+            const res = parseReply(box.value, rec);
+            if (res.error) {
+              msg.textContent = res.error;
+              return;
+            }
+            applyVote(rec, rv, res.status, res.note);
+          },
+          text: '识别',
+        })),
+      msg,
+      h('span', { class: 'hint', text: '或者看完回复，直接点它的结论：' }),
+      h('div', { class: 'chips' }, VERDICTS.map((s) => h('button', {
+        type: 'button',
+        class: 'chip verdict ' + s,
+        onclick: () => applyVote(rec, rv, s, note.value.trim()),
+        text: STATUS[s],
+      }))),
+      note);
+  }
+
+  // ---------- 动作 ----------
+
+  function applyVote(rec, rv, status, note) {
+    if (!castVote(rec, rv.id, status, note)) return;
+    const key = rec.id + ':' + rv.id;
+    ui.pasting.delete(key);
+    ui.showPrompt.delete(key);
+    delete ui.drafts[key];
+    delete ui.notes[key];
+    save();
+    render();
+    const copy = document.querySelector('[data-focus="' + CSS.escape('copy:' + key) + '"]');
+    if (copy) copy.focus();
+    toast(`${rv.name}：${STATUS[status]}` + (rec.reviewers.length > 1 ? `，这张单现在是「${STATUS[rec.status]}」` : ''));
+  }
+
+  async function copyText(text) {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch (e) { /* 走下面的老办法 */ }
+    const prev = document.activeElement;
+    const ta = h('textarea', { readonly: true, 'aria-hidden': 'true', style: 'position:fixed;top:0;left:-9999px;font-size:16px;' });
+    ta.value = text;
+    document.body.append(ta);
+    ta.select();
+    ta.setSelectionRange(0, text.length);
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    ta.remove();
+    if (prev && prev.focus) prev.focus();
+    return ok;
+  }
+
+  async function copyPrompt(rec, rv) {
+    const key = rec.id + ':' + rv.id;
+    const ok = await copyText(promptFor(rec, rv));
+    if (ok) {
+      const wasShown = ui.showPrompt.delete(key);
+      if (wasShown) render();
+      toast(`复制好了，发给${rv.name}`);
+    } else {
+      ui.showPrompt.add(key);
+      render();
+      toast('没能自动复制，手动复制下面那段');
+    }
+  }
+
+  function withdraw(rec) {
+    if (rec.status !== 'pending') return;
+    rec.status = 'withdrawn';
+    save();
+    render();
+    toast('撤回了');
+  }
+
+  function removeRequest(rec) {
+    if (!window.confirm(`删掉「${rec.item}」这张单？删了就找不回来了。`)) return;
+    state.requests = state.requests.filter((r) => r !== rec);
+    save();
+    render();
+  }
+
+  function removeReviewer(r) {
+    state.reviewers = state.reviewers.filter((x) => x.id !== r.id);
+    ui.selected.delete(r.id);
+    if (!ui.selected.size && state.reviewers.length) ui.selected.add(state.reviewers[0].id);
+    save();
+    render();
+    $('rv-name').focus();
+  }
+
+  $('rv-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const input = $('rv-name');
+    const name = clean(input.value, NAME_MAX);
+    if (!name) return;
+    if (state.reviewers.some((r) => r.name === name)) {
+      toast(`已经有${name}了`);
+      return;
+    }
+    if (state.reviewers.length >= REVIEWER_MAX) {
+      toast(`最多 ${REVIEWER_MAX} 位审批人`);
+      return;
+    }
+    const r = { id: newReviewerId(), name };
+    state.reviewers.push(r);
+    if (!ui.selected.size) ui.selected.add(r.id);
+    save();
+    input.value = '';
+    render();
+    toast(`加好了：${name}`);
+  });
+
+  $('req-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const item = clean($('f-item').value, ITEM_MAX);
+    const reason = clean($('f-reason').value, REASON_MAX);
+    const priceText = $('f-price').value.replace(/[,，¥￥\s]/g, '');
+    const price = Math.round(Number(priceText) * 100) / 100;
+    const picked = state.reviewers.filter((r) => ui.selected.has(r.id));
+    let problem = '';
+    if (!item) problem = '写一下想买什么';
+    else if (!priceText) problem = '写一下多少钱';
+    else if (!Number.isFinite(price)) problem = '价格要写数字';
+    else if (!(price > 0 && price <= PRICE_MAX)) problem = '价格不对';
+    else if (!reason) problem = '写一下为什么要买';
+    else if (!picked.length) problem = '至少选一位审批人';
+    $('form-err').textContent = problem;
+    if (problem) return;
+
+    const multi = picked.length > 1;
+    const rule = multi ? ui.rule : 'single';
+    const rec = {
+      id: newRequestId(),
+      item,
+      price,
+      reason,
+      urgency: ui.urgency,
+      rule,
+      reviewers: picked.map((r) => ({
+        id: r.id,
+        name: r.name,
+        weight: rule === 'weighted' ? clampWeight(ui.weights[r.id]) : 1,
+      })),
+      votes: {},
+      history: [],
+      created_at: new Date().toISOString(),
+      status: 'pending',
+    };
+    state.requests.unshift(rec);
+    save();
+    $('f-item').value = '';
+    $('f-price').value = '';
+    $('f-reason').value = '';
+    ui.urgency = 'month';
+    render();
+    if (multi) toast('递出去了，在下面挨个复制给审批人');
+    else copyPrompt(rec, rec.reviewers[0]);
+    const card = $('list').firstElementChild;
+    if (card) {
+      const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      card.scrollIntoView({ behavior: calm ? 'auto' : 'smooth', block: 'start' });
+    }
+  });
+
+  $('export').addEventListener('click', () => {
+    const blob = new Blob([JSON.stringify(state, null, 1)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const d = new Date();
+    const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+    const a = h('a', { href: url, download: `购物申请单备份-${stamp}.json` });
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+
+  $('import-btn').addEventListener('click', () => $('import').click());
+
+  $('import').addEventListener('change', async () => {
+    const input = $('import');
+    const file = input.files && input.files[0];
+    input.value = '';
+    if (!file) return;
+    try {
+      const next = normalize(JSON.parse(await file.text()));
+      if (!window.confirm(`导入 ${next.requests.length} 张单，会替换掉现在的 ${state.requests.length} 张，确定吗？`)) return;
+      state = next;
+      ui.selected = new Set(state.reviewers.slice(0, 1).map((r) => r.id));
+      ui.pasting.clear();
+      ui.showPrompt.clear();
+      save();
+      render();
+      toast('导入好了');
+    } catch (err) {
+      toast('导入失败：' + (err && err.message ? err.message : '文件读不出来'));
+    }
+  });
+
+  let toastTimer = 0;
+  function toast(text) {
+    const el = $('toast');
+    el.textContent = text;
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), 2800);
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>
